@@ -1,0 +1,160 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>locus</title>
+<meta name="description" content="Write math, hear it, watch it draw.">
+<meta name="author" content="Inat Studio">
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/katex.min.css">
+<script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/katex.min.js"></script>
+<link rel="stylesheet" href="css/style.css">
+<script type="module" src="js/main.js"></script>
+</head>
+<body>
+<div class="app">
+  <header class="top">
+    <span class="logo">locus</span>
+    <button id="play" type="button" data-tip="start / stop. the space bar does the same">play</button>
+    <label class="field" data-tip="tempo. one step is a 16th note">bpm <input id="bpm" type="number" min="20" max="400" step="1"></label>
+    <span id="pos" class="pos" data-tip="bar.step you're hearing right now">01.01</span>
+    <span class="grow"></span>
+    <select id="songs" aria-label="load a song" data-tip="load a demo song. it replaces what you have, so hit share first if you want to keep it"><option value="">songs</option></select>
+    <button id="share" type="button" data-tip="copies a link with the whole song packed into it">share</button>
+    <button id="export" type="button" data-tip="renders one pass of the loop to a .wav that loops cleanly">wav</button>
+    <button id="showBtn" type="button" data-tip="fullscreen view for recording. esc gets you out">stage</button>
+  </header>
+
+  <div class="harm">
+    <label data-tip="tonic of the scale. deg(0) is this note">key <select id="key"></select></label>
+    <label data-tip="the notes deg() walks through">scale <select id="scale"></select></label>
+    <label data-tip="chord names with spaces between them, like Am F C G. root and ch() follow these">chords <input id="prog" spellcheck="false" autocomplete="off"></label>
+    <label data-tip="how many bars each chord lasts">bars per chord <input id="per" type="number" min="1" max="64" step="1"></label>
+    <label data-tip="how many bars before the song starts over">loop <input id="bars" type="number" min="1" max="256" step="1"> bars</label>
+    <span id="harmErr" class="err"></span>
+  </div>
+
+  <main>
+    <section class="view">
+      <div class="stage" id="stage">
+        <canvas id="stageCanvas"></canvas>
+        <div class="tex" id="stageTex"></div>
+      </div>
+      <canvas id="scope" class="scope" aria-hidden="true"></canvas>
+
+      <div class="voices">
+        <div class="voices-head">
+          <span data-tip="every voice over the whole loop. zoom in and scroll sideways to move through it">song</span>
+          <span class="tools">
+            <button id="zoomOut" type="button" data-tip="zoom out (all the way out fits the whole loop)">-</button>
+            <button id="zoomIn" type="button" data-tip="zoom in">+</button>
+            <button id="add" type="button" data-tip="adds a plain sine voice to start from">+ voice</button>
+          </span>
+        </div>
+        <div class="tl">
+          <div class="tl-names" id="names">
+            <div class="tl-corner">bar</div>
+          </div>
+          <div class="tl-scroll" id="tlScroll">
+            <div class="tl-inner" id="tlInner">
+              <canvas id="tlCanvas" data-tip="blocks are hits. brighter means louder, higher up means a higher note. click a row to edit that voice, click the bar numbers to jump there"></canvas>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <aside class="edit" id="edit">
+      <div class="row">
+        <input id="vname" aria-label="voice name" spellcheck="false" autocomplete="off" data-tip="name of this voice, only shows up here">
+        <select id="inst" aria-label="load an instrument" data-tip="swap in a preset sound. it overwrites the code below"><option value="">instrument</option></select>
+        <button id="del" type="button" data-tip="deletes this voice">delete</button>
+      </div>
+      <label class="code"><span class="lhs" data-tip="the sound. runs every sample while a note plays. t is seconds into the note, f is its frequency. the last line is what you hear">y(t) =</span>
+        <textarea id="sound" rows="6" spellcheck="false" autocomplete="off"></textarea>
+        <span class="err" id="soundErr"></span>
+      </label>
+      <label class="code"><span class="lhs" data-tip="which steps play. s counts 0 to 15 through each bar, bar counts bars. 0 is silent, anything above that plays at that velocity">hit(n) =</span>
+        <textarea id="hit" class="wrap" rows="2" spellcheck="false" autocomplete="off"></textarea>
+        <span class="err" id="hitErr"></span>
+      </label>
+      <label class="code"><span class="lhs" data-tip="which note. 60 is middle C, +12 is an octave up. root, ch(j) and deg(d) follow the chords up top. a [list] plays a chord">note(n) =</span>
+        <textarea id="note" class="wrap" rows="2" spellcheck="false" autocomplete="off"></textarea>
+        <span class="err" id="noteErr"></span>
+      </label>
+      <div class="knobs">
+        <label data-tip="how long each note can ring, in 16ths. it fades out at the end">length (steps) <input id="len" type="number" min="0.25" max="4096" step="0.25"></label>
+        <label data-tip="what the graph shows. whole note draws the full sound, cycle zooms in on a few waves">plot <select id="plot"><option value="auto">auto</option><option value="note">whole note</option><option value="cycle">cycle</option></select></label>
+        <label data-tip="volume of this voice">gain <input id="gain" type="range" min="0" max="1.5" step="0.01"></label>
+        <label data-tip="left / right">pan <input id="pan" type="range" min="-1" max="1" step="0.01"></label>
+        <label data-tip="how much of it goes into the reverb">reverb <input id="rev" type="range" min="0" max="1" step="0.01"></label>
+        <label class="check" data-tip="a new note cuts off the one still ringing. good for drums and bass"><input id="mono" type="checkbox"> mono (new notes cut old ones)</label>
+      </div>
+
+      <details class="ref">
+        <summary data-tip="everything you can use in the boxes above">reference</summary>
+        <h4>y(t), the sound</h4>
+        <p>Runs once per sample for every note that's playing.</p>
+        <dl>
+          <dt>t</dt><dd>seconds since the note started</dd>
+          <dt>f</dt><dd>note frequency in Hz</dd>
+          <dt>m</dt><dd>note number (69 = A4)</dd>
+          <dt>v</dt><dd>velocity, whatever hit(n) returned (0 to 1)</dd>
+          <dt>d</dt><dd>note length in seconds</dd>
+          <dt>i</dt><dd>sample index since the note started</dd>
+          <dt>sr</dt><dd>sample rate</dd>
+        </dl>
+        <h4>hit(n)</h4>
+        <p>Runs every step (a 16th note). Anything above 0 plays, and the value becomes the velocity.</p>
+        <dl>
+          <dt>n</dt><dd>step in the loop</dd>
+          <dt>s</dt><dd>step in the bar, 0 to 15</dd>
+          <dt>bar</dt><dd>bar number</dd>
+          <dt>k</dt><dd>which chord we're on</dd>
+        </dl>
+        <h4>note(n)</h4>
+        <p>The note number to play. A [list] plays all of them.</p>
+        <dl>
+          <dt>root</dt><dd>root of the current chord, octave 2</dd>
+          <dt>ch(j)</dt><dd>j-th chord tone counting up from octave 3</dd>
+          <dt>deg(d)</dt><dd>d-th degree of the scale counting up from octave 4</dd>
+          <dt>euclid(k, len, s)</dt><dd>k hits spread evenly over len steps (also in hit)</dd>
+        </dl>
+        <h4>functions</h4>
+        <dl>
+          <dt>saw sqr tri</dt><dd>waves with period 1, so saw(f*t). sqr(x, w) takes a pulse width</dd>
+          <dt>osc(hz)</dt><dd>phase that follows a moving frequency: sin(tau*osc(hz))</dd>
+          <dt>lp hp bp</dt><dd>filters: lp(x, hz) or lp(x, hz, q)</dd>
+          <dt>noise(i)</dt><dd>hash noise, same output for the same i</dd>
+          <dt>ad(t, a, d)</dt><dd>attack then exponential decay</dd>
+          <dt>hold(x, hz)</dt><dd>sample and hold</dd>
+          <dt>crush(x, bits)</dt><dd>bit crusher</dd>
+          <dt>math</dt><dd>sin cos tan tanh atan exp log sqrt abs sign floor ceil round fract min max clamp mix pow mod mtof</dd>
+          <dt>constants</dt><dd>pi tau e</dd>
+        </dl>
+        <h4>syntax</h4>
+        <p><code>+ - * / % ^</code>, comparisons give 1 or 0, <code>&amp;&amp; || !</code>, <code>a ? b : c</code>,
+          bit ops <code>&amp; | &lt;&lt; &gt;&gt;</code>. <code>[a, b, c][i]</code> picks from a list and wraps around.
+          <code>name = ...</code> on its own line makes a variable, the last line is the result. <code>//</code> starts a comment.</p>
+      </details>
+    </aside>
+  </main>
+</div>
+
+<div id="show" class="show" hidden>
+  <div class="show-frame" id="showFrame">
+    <canvas id="showCanvas"></canvas>
+    <div class="tex" id="showTex"></div>
+  </div>
+  <div class="show-ui">
+    <button type="button" data-ratio="wide" data-tip="landscape frame">16:9</button>
+    <button type="button" data-ratio="tall" data-tip="portrait frame, for phones">9:16</button>
+    <button type="button" data-ratio="fill" data-tip="use the whole screen">fill</button>
+    <button type="button" id="follow" data-tip="auto flips through the voices every 2 bars. selected sticks to the one you picked">auto</button>
+    <button type="button" id="showClose" data-tip="back to the editor (esc)">close</button>
+  </div>
+</div>
+
+<div id="toast" class="toast" role="status" hidden></div>
+</body>
+</html>
