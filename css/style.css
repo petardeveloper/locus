@@ -80,11 +80,13 @@ main {
   gap: 10px;
 }
 
+.view { container-type: inline-size; }
+/* full width; 16:9 until it gets too tall, then it just gets wider */
 .stage {
   position: relative;
-  aspect-ratio: 16 / 9;
-  max-width: 100%;
-  max-height: 54vh;
+  width: 100%;
+  height: min(54vh, 56.25cqw);
+  min-height: 180px;
   background: var(--well);
   overflow: hidden;
   flex: none;
@@ -230,7 +232,6 @@ textarea.bad { border-color: var(--hot); }
   main { grid-template-columns: minmax(0, 1fr); }
   .view, .edit { overflow: visible; }
   .edit { border-left: 0; border-top: 1px solid var(--line); }
-  .stage { max-height: none; }
   .tl { grid-template-columns: 124px minmax(0, 1fr); }
 }
 

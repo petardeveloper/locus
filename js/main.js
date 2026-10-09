@@ -630,7 +630,7 @@ function plotBox(w, h) {
 
 function placeTex(el, w, h) {
   el.style.top = (w >= h ? h * 0.71 : h * 0.62) + 'px';
-  el.style.fontSize = (w >= h ? w * 0.021 : w * 0.042) + 'px';
+  el.style.fontSize = (w >= h ? Math.min(w * 0.021, h * 0.04) : w * 0.042) + 'px';
 }
 
 function paint(cv, texEl, i, stepF, time) {
