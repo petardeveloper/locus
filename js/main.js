@@ -120,12 +120,15 @@ function loadSong(s) {
   fillHeader();
   buildNames();
   showEditor();
-  changed(true);
+  changed(true, true);
 }
 
 let pushTimer = 0;
-function changed(now) {
+function changed(now, keepLink) {
   tlDirty = true;
+  // a shared link in the address bar is a snapshot. once you edit, drop it so a
+  // refresh brings back your latest version (from local storage) instead of the old link
+  if (!keepLink && location.hash) history.replaceState(null, '', location.pathname);
   clearTimeout(pushTimer);
   pushTimer = setTimeout(() => {
     if (node) node.port.postMessage({ type: 'song', song });
